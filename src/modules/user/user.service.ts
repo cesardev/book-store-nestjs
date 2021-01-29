@@ -42,7 +42,7 @@ export class UserService {
 
    async create( user: User ): Promise<User> {
 
-      user.details = new UserDetails;
+      user.details = new UserDetails();
 
       const repoRole = await getConnection().getRepository( Role );
       const defaultRole = await repoRole.findOne({ where: { name: 'GENERAL' } });

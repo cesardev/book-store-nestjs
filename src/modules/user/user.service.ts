@@ -5,23 +5,28 @@ import { User } from './user.entity';
 import { UserDetails } from './user-details.entity';
 import { getConnection } from 'typeorm';
 import { Role } from '../role/role.entity';
+import { RoleRepository } from '../role/role.repository';
+import { status } from '../../shared/entity-status.enum';
+import { RoleType } from '../role/roletype.enum';
 
 @Injectable()
 export class UserService {
 
    constructor(
-      @InjectRepository(UserRepository)
-      private readonly userRepository: UserRepository
+      @InjectRepository( UserRepository )
+      private readonly _userRepository: UserRepository,
+      @InjectRepository( RoleRepository )
+      private readonly _roleRepository: RoleRepository
    ) {}
 
-   async get( id: number ): Promise<User> {
+   public async get( id: number ): Promise<User> {
 
       if ( !id ) {
          throw new BadRequestException('id must be sent');
       }
 
-      const user: User = await this.userRepository.findOne( id, {
-         where: { status: 'ACTIVE' }
+      const user: User = await this._userRepository.findOne( id, {
+         where: { status: status.ACTIVE }
       });
 
       if ( !user ) {
@@ -31,47 +36,74 @@ export class UserService {
       return user;
    }
 
-   async getAll(): Promise<User[]> {
+   public async getAll(): Promise<User[]> {
 
-      const users: User[] = await this.userRepository.find( {
-         where: { status: 'ACTIVE' }
+      const users: User[] = await this._userRepository.find( {
+         where: { status: status.ACTIVE }
       });
 
       return users;
    }
 
-   async create( user: User ): Promise<User> {
+   public async create( user: User ): Promise<User> {
 
       user.details = new UserDetails();
 
       const repoRole = await getConnection().getRepository( Role );
-      const defaultRole = await repoRole.findOne({ where: { name: 'GENERAL' } });
+      const defaultRole = await repoRole.findOne({ where: { name: RoleType.GENERAL } });
 
       user.roles = [ defaultRole ];
 
-      const savedUser = await this.userRepository.save( user );
+      const savedUser = await this._userRepository.save( user );
 
       return savedUser;
 
    }
 
-   async update( id: number, user: User ): Promise<void> {
+   public async update( id: number, user: User ): Promise<void> {
 
-      await this.userRepository.update(id, user);
+      await this._userRepository.update(id, user);
 
    }
 
-   async delete( id: number ): Promise<void> {
+   public async delete( id: number ): Promise<void> {
 
-      const userExists = await this.userRepository.findOne(id, {
-         where: { status: 'ACTIVE' },
+      const userExist = await this._userRepository.findOne(id, {
+         where: { status: status.ACTIVE },
       });
 
-      if ( !userExists ) {
+      if ( !userExist ) {
          throw new NotFoundException();
       }
 
-      await this.userRepository.update( id, { status: 'INACTIVE' });
+      await this._userRepository.update( id, { status: status.INACTIVE });
 
    }
+
+   public async setRoleToUser( userId: number , roleId: number ) {
+
+      const userExist = await this._userRepository.findOne( userId, {
+         where: { status: status.ACTIVE },
+      });
+
+      if ( !userExist ) {
+         throw new NotFoundException( 'User does not exist' );
+      }
+
+      const roleExist = await this._roleRepository.findOne( roleId, {
+         where: { status: status.ACTIVE }
+      });
+
+      if ( !roleExist ) {
+         throw new NotFoundException( 'Role does not exist' );
+      }
+
+      userExist.roles.push( roleExist );
+
+      await this._userRepository.save( userExist );
+
+      return true;
+
+   }
+
 }
